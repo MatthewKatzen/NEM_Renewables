@@ -23,14 +23,15 @@ tech <- list(Solar = c("Photovoltaic Tracking  Flat Panel", "Photovoltaic Flat P
 
 years <- c(2015,2017,2019)
 
-direction <- list(NS = c("NSW", "QLD"),
-                  EW = c("SA", "VIC"))
+direction <- list(NS = c("VIC", "NSW", "QLD"),
+                  EW = c("SA", "VIC"),
+                  All = c("SA", "VIC", "TAS", "NSW", "QLD"))
 
 # CF Frontiers
 ###########################
 
 output <- NULL
-for (i in 1:2){#direction
+for (i in 1:3){#direction
   for (j in 1:3){#tech
     temp <- full_data %>% 
       filter(nem_year(settlementdate) == 2019,#only 2019
@@ -119,7 +120,7 @@ output %>% filter(tech == "All") %>%
   theme(legend.title=element_blank(),
         legend.spacing.y = unit(0, 'cm'),
         legend.margin = margin(0,0,0,0, unit="cm"))+
-  ggsave("Output/Direction/Frontier_5min_Direction_CF_NS_QLD+NSW.png", width = 7)
+  ggsave("Output/Direction/Frontier_5min_Direction_CF_NS_QLD+NSW+VIC.png", width = 7)
 
 
 
@@ -127,7 +128,7 @@ output %>% filter(tech == "All") %>%
 ###########################
 
 output <- NULL
-for (i in 1:2){#direction
+for (i in 1:3){#direction
   for (j in 1:3){#tech
     temp <- full_data %>% 
       filter(nem_year(settlementdate) == 2019,#only 2019
@@ -217,4 +218,4 @@ output %>% filter(tech == "All") %>%
   theme(legend.title=element_blank(),
         legend.spacing.y = unit(0, 'cm'),
         legend.margin = margin(0,0,0,0, unit="cm"))+
-  ggsave("Output/Direction/Frontier_5min_Direction_Rev_NS_QLD+NSW.png", width = 7)
+  ggsave("Output/Direction/Frontier_5min_Direction_Rev_NS_QLD+NSW+VIC.png", width = 7)

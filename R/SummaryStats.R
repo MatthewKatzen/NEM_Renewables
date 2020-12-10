@@ -9,7 +9,7 @@ Sys.setenv(TZ='UTC')
 
 #Load data
 full_data <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_data.csv") %>% 
-  mutate(settlementdate = ymd_hms(settlementdate)) %>% as_tibble()
+  mutate(settlementdate = ymd_hms(settlementdate)) %>% as_tibble() 
 
 # SUMMARY STATS
 ###########################
@@ -17,6 +17,10 @@ full_data <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_data.csv") %>%
 #how many of each type?
 full_data %>% select(duid, technology_type_descriptor) %>% unique() %>% 
   count(technology_type_descriptor)
+
+#cap of each
+full_data %>% select(technology_type_descriptor, registeredcapacity, region) %>% unique() %>% 
+  group_by(region, technology_type_descriptor) %>%  summarise(sum(registeredcapacity), n())
 
 # how much generated?
 full_data %>% group_by(technology_type_descriptor)  %>% 
@@ -35,6 +39,7 @@ scada <- scada %>%
                mk_year(settlementdate) == year(settlementdate))) %>%  #produce at any point on 1 JAN for each of the years
   ungroup() %>% select(-year)
 
-scada %>% ungroup() %>%  summarise(mwh = sum(scadavalue/12))
+
+# E[output] graphs Dispactable only 
 
 

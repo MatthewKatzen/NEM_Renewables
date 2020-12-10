@@ -34,7 +34,7 @@ output %>% filter(year == 2019) %>%
   scale_colour_manual(values=c(hue_pal()(3)[1], hue_pal()(3)[2], hue_pal()(3)[3], "black", "black"))+
   theme_bw(base_size=10)+
   theme(legend.title=element_blank())+
-  ggsave("Output/Frontier_5min_CF.png", width = 7)
+  ggsave("Output/2019/Frontier_5min_CF.png", width = 7)
 
 
 # OUTPUT RAMAX v ACTUAL
@@ -78,7 +78,7 @@ portfolio %>%
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())+
   theme(legend.title=element_blank())+ #remove legeend title
-  ggsave("Output/RaMax_CF_Weights.png", width = 7)
+  ggsave("Output/2019/RaMax_CF_Weights.png", width = 7)
 
 
 
@@ -120,7 +120,7 @@ output %>% filter(year == 2019) %>%
   scale_colour_manual(values=c(hue_pal()(3)[1], hue_pal()(3)[2], hue_pal()(3)[3], "black", "black"))+
   theme_bw(base_size=10)+
   theme(legend.title=element_blank())+
-  ggsave("Output/Frontier_5min_Rev.png", width = 7)
+  ggsave("Output/2019/Frontier_5min_Rev.png", width = 7)
 
 
 # OUTPUT RAMAX v ACTUAL
@@ -165,7 +165,7 @@ portfolio %>%
         axis.ticks.x=element_blank())+
   theme(legend.title=element_blank())+ #remove legeend title
   labs(y = "Weight")+
-  ggsave("Output/RaMax_Rev_Weights.png", width = 7)
+  ggsave("Output/2019/RaMax_Rev_Weights.png", width = 7)
 
 
 

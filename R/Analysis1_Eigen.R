@@ -35,7 +35,7 @@ S %>% filter(year == 2019) %>%
   labs(x = "Number of PCs", y = "% Explained Variation") + 
   theme_bw(base_size=10)+
   theme(legend.title=element_blank())+
-  ggsave("Output/EigenSum_5min_CF.png", width = 7)
+  ggsave("Output/2019/EigenSum_5min_CF.png", width = 7)
 
 
 #  Revenue Eigenvalues
@@ -57,5 +57,5 @@ S %>% filter(year == 2019) %>%
   labs(x = "Number of PCs", y = "% Explained Variation") + 
   theme_bw(base_size=10)+
   theme(legend.title=element_blank())+
-  ggsave("Output/EigenSum_5min_Rev.png", width = 7)
+  ggsave("Output/2019/EigenSum_5min_Rev.png", width = 7)
 

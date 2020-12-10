@@ -24,13 +24,14 @@ tech <- list(Solar = c("Photovoltaic Tracking  Flat Panel", "Photovoltaic Flat P
 years <- c(2015,2017,2019)
 
 direction <- list(NS = c("NSW", "QLD"),
-                  EW = c("SA", "VIC"))
+                  EW = c("SA", "VIC"),
+                  All = c("SA", "VIC", "TAS", "NSW", "QLD"))
 
 #  Output Eigenvalues
 ######################################
 
 S <- NULL
-for (i in 1:2){#direction
+for (i in 1:3){#direction
   for (j in 1:3){#tech
     temp <- full_data %>% 
       filter(nem_year(settlementdate) == 2019,#only 2019
@@ -58,19 +59,20 @@ S %>% filter(tech == "All") %>%
   geom_line() +
   geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "NS", tech == "All") %>% nrow()), colour = "NS"))+
   geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "EW", tech == "All") %>% nrow()), colour = "EW"))+
+  geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "All", tech == "All") %>% nrow()), colour = "All"))+
   scale_x_continuous(breaks = seq(0, S %>% nrow(), 10))+
   scale_y_continuous(breaks = seq(0, 1, 0.2), limits = c(0,1)) +
   labs(x = "Number of PCs", y = "% Explained Variation")+
   theme_bw(base_size=10)+
   theme(legend.title=element_blank())+
-  ggsave("Output/Direction/EigenSum_5min_CF_Direction_NS_QLD+NSW.png", width = 7)
+  ggsave("Output/Direction/EigenSum_5min_CF_Direction_NS_QLD+NSW+VIC.png", width = 7)
 
 
 #  Rev Eigenvalues
 ######################################
 
 S <- NULL
-for (i in 1:2){#direction
+for (i in 1:3){#direction
   for (j in 1:3){#tech
     temp <- full_data %>% 
       filter(nem_year(settlementdate) == 2019,#only 2019
@@ -98,6 +100,7 @@ S %>% filter(tech == "All") %>%
   geom_line() +
   geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "NS", tech == "All") %>% nrow()), colour = "NS"))+
   geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "EW", tech == "All") %>% nrow()), colour = "EW"))+
+  geom_abline(aes(intercept=0, slope=1/(S %>% filter(direction == "All", tech == "All") %>% nrow()), colour = "All"))+
   scale_x_continuous(breaks = seq(0, S %>% nrow(), 10))+
   scale_y_continuous(breaks = seq(0, 1, 0.2), limits = c(0,1)) +
   labs(x = "Number of PCs", y = "% Explained Variation")+
