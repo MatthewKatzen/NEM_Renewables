@@ -6,6 +6,15 @@ library(janitor)
 library(ggpubr)
 Sys.setenv(TZ='UTC')
 
+#FUNCS
+nem_year <- function(datetime){
+  year(datetime - minutes(5))
+}
+
+nem_month <- function(datetime){
+  month(datetime - minutes(5))
+}
+
 #downlaod data 
 #########################
 
@@ -55,8 +64,4 @@ download_rrp <- function(yearmonth){
   }    
 }
 
-nem_year <- function(datetime){
-  ifelse(yday(datetime) == 1 & as.ITime(datetime) == as.ITime("00:00:00"),
-         year(datetime)-1,
-         year(datetime))
-}
+

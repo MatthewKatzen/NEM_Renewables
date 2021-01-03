@@ -12,19 +12,16 @@ Sys.setenv(TZ='UTC')
 
 # load data
 #####################
-full_data <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_data.csv") %>% #only SEMI
-  mutate(settlementdate = ymd_hms(settlementdate)) %>% as_tibble()  %>% 
-  left_join(generator_details_AEMO %>% select(duid, region), by = "duid")
 
+full_data_2019 <- fread("D:/Data/Cleaned/Renewables/Renewables_30min_with_non_data_and_details.csv") %>% 
+  filter(nem_year(settlementdate) == 2019)
 
-tech <- list(Solar = c("Photovoltaic Tracking  Flat Panel", "Photovoltaic Flat Panel"), 
-             Wind = "Wind - Onshore",
-             All = c("Photovoltaic Tracking  Flat Panel", "Photovoltaic Flat Panel", "Wind - Onshore"))
+tech <- list("Solar" = "Solar", 
+             "Wind" = "Wind",
+             "All" = c("Solar", "Wind"))
 
-years <- c(2015,2017,2019)
-
-direction <- list(NS = c("VIC", "NSW", "QLD"),
-                  EW = c("SA", "VIC"),
+direction <- list(NS = c("NSW", "QLD"),
+                  EW = c("TAS", "SA", "VIC"),
                   All = c("SA", "VIC", "TAS", "NSW", "QLD"))
 
 # CF Frontiers
@@ -33,9 +30,8 @@ direction <- list(NS = c("VIC", "NSW", "QLD"),
 output <- NULL
 for (i in 1:3){#direction
   for (j in 1:3){#tech
-    temp <- full_data %>% 
-      filter(nem_year(settlementdate) == 2019,#only 2019
-             technology_type_descriptor %in% tech[[j]], #all tech
+    temp <- full_data_2019 %>% 
+      filter(fuel_source_descriptor %in% tech[[j]], #all tech
              region %in% direction[[i]]) %>% #loop through direction
       select(duid, cf, settlementdate) %>% 
       pivot_wider(names_from = duid, values_from = cf) %>% 
@@ -84,7 +80,7 @@ for (i in 1:3){#direction
                                         stringsAsFactors = FALSE) 
   
   #add regional actual allocation
-  actual_allocation <- full_data  %>% filter(region %in% direction[[i]]) %>% 
+  actual_allocation <- full_data_2019  %>% filter(region %in% direction[[i]]) %>% 
     group_by(duid) %>% filter(row_number() == 1) %>%  #bc LKBONNY1 has some data missing, its regcap varies, so for now this is taking its orginal cap
     ungroup() %>% 
     mutate(weight = registeredcapacity/sum(registeredcapacity))
@@ -120,7 +116,7 @@ output %>% filter(tech == "All") %>%
   theme(legend.title=element_blank(),
         legend.spacing.y = unit(0, 'cm'),
         legend.margin = margin(0,0,0,0, unit="cm"))+
-  ggsave("Output/Direction/Frontier_5min_Direction_CF_NS_QLD+NSW+VIC.png", width = 7)
+  ggsave("Output/Semi and Non/30 min/Direction/Frontier_30min_Direction_CF_NSW+QLD_SA+VIC+TAS.png", width = 7)
 
 
 
@@ -130,9 +126,8 @@ output %>% filter(tech == "All") %>%
 output <- NULL
 for (i in 1:3){#direction
   for (j in 1:3){#tech
-    temp <- full_data %>% 
-      filter(nem_year(settlementdate) == 2019,#only 2019
-             technology_type_descriptor %in% tech[[j]], #all tech
+    temp <- full_data_2019 %>% 
+      filter(fuel_source_descriptor %in% tech[[j]], #all tech
              region %in% direction[[i]]) %>% #loop through direction
       select(duid, rev_mw, settlementdate) %>% 
       pivot_wider(names_from = duid, values_from = rev_mw) %>% 
@@ -181,7 +176,7 @@ for (i in 1:3){#direction
                                         stringsAsFactors = FALSE) 
   
   #add regional actual allocation
-  actual_allocation <- full_data  %>% filter(region %in% direction[[i]]) %>% 
+  actual_allocation <- full_data_2019  %>% filter(region %in% direction[[i]]) %>% 
     group_by(duid) %>% filter(row_number() == 1) %>%  #bc LKBONNY1 has some data missing, its regcap varies, so for now this is taking its orginal cap
     ungroup() %>% 
     mutate(weight = registeredcapacity/sum(registeredcapacity))
@@ -208,14 +203,14 @@ output %>% filter(tech == "All") %>%
   group_by(tech, type, directions) %>% filter(rev_mw>=rev_mw[which(sd==min(sd))]) %>% ungroup() %>% 
   mutate(tech = factor(tech)) %>% 
   ungroup() %>% 
-  filter(sd<10) %>% 
+  filter(sd<50) %>% 
   ggplot(aes(x = sd, y = rev_mw, colour = directions, shape = type, size = type))+
   geom_point() +
-  labs(x = "Standard Deviation", y = "5min Revenue per MW") +
+  labs(x = "Standard Deviation", y = "30min Revenue per MW") +
   scale_shape_manual(breaks = c("RA Max", "Actual"), values=c(10, 16, 8))+
   scale_size_manual(breaks = c("RA Max", "Actual"), values=c(4, 1.5, 4))+
   theme_bw(base_size=10)+
   theme(legend.title=element_blank(),
         legend.spacing.y = unit(0, 'cm'),
         legend.margin = margin(0,0,0,0, unit="cm"))+
-  ggsave("Output/Direction/Frontier_5min_Direction_Rev_NS_QLD+NSW+VIC.png", width = 7)
+  ggsave("Output/Semi and Non/30 min/Direction/Frontier_30min_Direction_Rev_NSW+QLD_SA+VIC+TAS.png", width = 7)

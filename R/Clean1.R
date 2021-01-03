@@ -12,11 +12,16 @@ Sys.setenv(TZ='UTC')
 
 generator_details_AEMO <- fread("D:/Data/RAW/AEMO/Website/generators_and_loads.csv") %>% clean_names() %>% 
   distinct(duid, .keep_all = TRUE) %>% 
-  select(duid, classification, technology_type_descriptor, station_name, region) %>% 
+  select(duid, classification, fuel_source_descriptor, station_name, region) %>% 
   mutate(region = substr(region, 1, nchar(region)-1)) %>% 
-  filter(technology_type_descriptor %in% c("Wind - Onshore", "Photovoltaic Flat Panel", "Photovoltaic Tracking  Flat Panel"))
-
-
+  filter(fuel_source_descriptor %in% c("Wind", "Solar"),
+         duid != "HPRG1") %>% #for some reaosn Hornsdale battery considered wind powered
+  left_join(fread("D:/Data/RAW/AEMO/NEMWEB/DUDETAIL/PUBLIC_DVD_DUDETAIL_201912010000.CSV") %>% #add cap
+              clean_names() %>% 
+              group_by(duid) %>% 
+              filter(effectivedate == max(effectivedate)) %>% 
+              select(duid, registeredcapacity), 
+            by = "duid") 
 
 #scada data
 scada <- map(list.files("D:/Data/RAW/AEMO/NEMWEB/UNIT_SCADA/", full.names = T),
@@ -40,134 +45,95 @@ rrp <-  map(list.files("D:/Data/RAW/AEMO/NEMWEB/DISPATCHPRICE/", full.names = T)
   select(-regionid, -interval)
 
 
-#capacities
-#only WATERLWF increased capacity during timeframe
-capacities <- fread("D:/Data/RAW/AEMO/NEMWEB/DUDETAIL/PUBLIC_DVD_DUDETAIL_201912010000.CSV") %>% 
-  clean_names() %>% 
-  group_by(duid) %>% 
-  filter(effectivedate == max(effectivedate)) %>% 
-  select(duid, registeredcapacity)  
-  #distinct(duid, .keep_all = TRUE) 
 
-# CLEAN
-#########################
-
-
-#Remove if not generating from start of year 
-scada <- scada %>% 
-  group_by(duid, year = mk_year(settlementdate)) %>%  
-  filter(any(yday(settlementdate) == 1 & 
-               mk_year(settlementdate) == year(settlementdate))) %>%  #produce at any point on 1 JAN for each of the years
-  ungroup() %>% select(-year)
-
-#insert missing scada observations INCOMPLETE
-scada <- scada %>% 
-  group_by(year = nem_year(settlementdate)) %>% 
-  complete(settlementdate, duid) %>% 
-  ungroup %>% select(-year)
-
-#neg values
-scada <- scada %>% mutate(scadavalue = ifelse(scadavalue<0, 
-                                              0, 
-                                              scadavalue))
+# CLEAN and IMPUTATION
+# RUN CLEAN2_MissingValues
+########################################
 
 
 #merge
 #########################
-full_data <- generator_details_AEMO %>% left_join(capacities, by = "duid") %>% 
-  right_join(scada, by = "duid") %>% 
+full_data <- scada_imputed %>% 
+  left_join(generator_details_AEMO %>% select(-classification, -station_name), by = "duid") %>% 
   left_join(rrp, by = c("region", "settlementdate"))
 
+fwrite(full_data, "D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_ungrouped.csv")
 
-#WATERLWF changed capacity
-##########################
-full_data <- full_data %>% mutate(registeredcapacity = ifelse(duid == "WATERLWF" & 
-                                                                ymd_hms(settlementdate) < ymd_hms("2016/10/29 00:00:00 UTC"),
-                                                         111,
-                                                         registeredcapacity))
-  
+#
 
-
-
-
-
-#missing data regression imputation INCOMPLETE
-############################
+full_data <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_ungrouped.csv") %>% 
+  mutate(settlementdate = ymd_hms(settlementdate)) %>% 
+  mutate(registeredcapacity = fifelse(duid == "WATERLWF" & #only WATERLWF changed capacity bw '15-19
+                                        ymd_hms(settlementdate) < ymd_hms("2016/10/29 00:00:00 UTC"),
+                                      111,
+                                      registeredcapacity))
 
 
 
-#Create CF and Rev variables
-##############################
-full_data <- full_data %>% ungroup() %>% 
-  mutate(cf = scadavalue/registeredcapacity,#create cf variable
-         rev_mw = scadavalue/12*rrp30*(1/registeredcapacity))
-  
-
-# Aggregate cleaning ONLY SEMI 
-###################################
-full_data <- full_data %>% ungroup() %>% filter(classification == "Semi-Scheduled") %>% #only keep semi
-  mutate(duid = case_when(duid == "BNGSF2" ~ "BNGSF1", #merge all gens with multiple duids
-                          duid == "DAYDSF2" ~ "DAYDSF1",
-                          duid == "DUNDWF2" ~ "DUNDWF1",
-                          duid == "DUNDWF3" ~ "DUNDWF1",
-                          duid == "GULLRWF2" ~ "GULLRWF1",
-                          duid == "HALLWF2" ~ "HALLWF1",
-                          duid == "HDWF2" ~ "HDWF1",
-                          duid == "HDWF3" ~ "HDWF1",
-                          duid == "LKBONNY2" ~ "LKBONNY1",
-                          duid == "LKBONNY3" ~ "LKBONNY1",
-                          duid == "LIMOSF21" ~ "LIMOSF11",
-                          duid == "NUMURSF2" ~ "NUMURSF1",
-                          duid == "OAKEY2SF" ~ "OAKEY1SF",
-                          duid == "SNOWNTH1" ~ "SNOWSTH1",
-                          duid == "SNOWTWN1" ~ "SNOWSTH1",
-                          TRUE ~ duid)) %>% 
-  group_by(settlementdate, duid, technology_type_descriptor, rrp30) %>% 
-  summarise(scadavalue = sum(scadavalue),
-            mwh = sum(scadavalue)/12,
-            registeredcapacity = sum(registeredcapacity)) %>% 
-  ungroup() %>% 
-  mutate(cf = scadavalue/registeredcapacity,#create cf variable
-         rev_mw = mwh*rrp30*(1/registeredcapacity))  #create rev per MW of cap variable 
-
-fwrite(full_data, "D:/Data/Cleaned/Renewables/Renewables_5min_data.csv")
-
-
-# Aggregate cleaning INCOMPLETE 
+# Aggregate cleaning
 ###################################
 full_data <- full_data %>% ungroup() %>% 
-  mutate(duid = case_when(duid == "BNGSF2" ~ "BNGSF1", #merge all gens with multiple duids
-                          duid == "DAYDSF2" ~ "DAYDSF1",
-                          duid == "DUNDWF2" ~ "DUNDWF1",
-                          duid == "DUNDWF3" ~ "DUNDWF1",
-                          duid == "GULLRWF2" ~ "GULLRWF1",
-                          duid == "HALLWF2" ~ "HALLWF1",
-                          duid == "HDWF2" ~ "HDWF1",
-                          duid == "HDWF3" ~ "HDWF1",
-                          duid == "LKBONNY2" ~ "LKBONNY1",
-                          duid == "LKBONNY3" ~ "LKBONNY1",
-                          duid == "LIMOSF21" ~ "LIMOSF11",
-                          duid == "NUMURSF2" ~ "NUMURSF1",
-                          duid == "OAKEY2SF" ~ "OAKEY1SF",
-                          duid == "SNOWNTH1" ~ "SNOWSTH1",
-                          duid == "SNOWTWN1" ~ "SNOWSTH1",
-                          TRUE ~ duid)) %>% 
-  group_by(settlementdate, duid, technology_type_descriptor, rrp30) %>% 
+  mutate(duid2 = fcase(duid == "BNGSF2", "BNGSF1", #merge all gens with multiple duids
+                          duid == "DAYDSF2", "DAYDSF1",
+                          duid == "DUNDWF2", "DUNDWF1",
+                          duid == "DUNDWF3", "DUNDWF1",
+                          duid == "GULLRWF2", "GULLRWF1",
+                          duid == "HALLWF2", "HALLWF1",
+                          duid == "HDWF2", "HDWF1",
+                          duid == "HDWF3", "HDWF1",
+                          duid == "LKBONNY2", "LKBONNY1",
+                          duid == "LKBONNY3", "LKBONNY1",
+                          duid == "LIMOSF21", "LIMOSF11",
+                          duid == "NUMURSF2", "NUMURSF1",
+                          duid == "OAKEY2SF", "OAKEY1SF",
+                          duid == "SNOWNTH1", "SNOWSTH1",
+                          duid == "SNOWTWN1", "SNOWSTH1",
+                          default = NA)) %>% 
+  mutate(duid = fifelse(is.na(duid2),
+                        duid,
+                        duid2)) %>% select(-duid2) %>% data.frame()
+
+fwrite(full_data, "D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data.csv")
+
+# SPlit back into years
+
+full_data_temp <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data.csv", 
+                   select = c("settlementdate", "duid", "registeredcapacity", "scadavalue", "rrp30")) %>% 
+  filter(nem_year(settlementdate) == 2019)
+
+full_data_temp <- full_data_temp %>% 
+  group_by(settlementdate, duid) %>% 
   summarise(scadavalue = sum(scadavalue),
-            mwh = sum(scadavalue)/12,
-            registeredcapacity = sum(registeredcapacity)) %>% 
+            registeredcapacity = sum(registeredcapacity),
+            rrp30 = rrp30[1]) %>% #all rrp30s are the same
   ungroup() %>% 
   mutate(cf = scadavalue/registeredcapacity,#create cf variable
-         rev_mw = mwh*rrp30*(1/registeredcapacity)) #%>%  #create rev per MW of cap variable 
-  #mutate(settlementdate = ceiling_date(settlementdate, "hour")) %>% #convert to hourly
-  #group_by(settlementdate, duid, technology_type_descriptor) %>%
-  #summarise(mwh = sum(mwh),
-  #         rev = sum(rev),
-  #         cf = mean(cf),
-  #         registeredcapacity = mean(registeredcapacity)) #some scada values are missing, this takes mean of cap over hour
+         rev_mw = scadavalue/12*rrp30*(1/registeredcapacity))  #create rev per MW of cap variable 
+
+fwrite(full_data_temp, "D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_2019.csv")
+
+#merge years together AGAIN
+
+full_data <- rbind(fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_2015.csv"),
+                   fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_2017.csv"),
+                   fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data_2019.csv"))
+
+fwrite(full_data, "D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data.csv")
 
 
-# SAVE
-###########################
+# Aggregate cleaning 30min level INCOMPLETE
+###################################
+full_data <- fread("D:/Data/Cleaned/Renewables/Renewables_5min_with_non_data.csv")
+  
+full_data <- full_data %>%
+  mutate(settlementdate = ceiling_date(settlementdate, "30 min")) %>% #convert to 30 min
+  group_by(settlementdate, duid, registeredcapacity) %>%
+  summarise(scadavalue = sum(scadavalue),
+            rev_mw = sum(rev_mw),
+            cf = mean(cf))
+
+fwrite(full_data, "D:/Data/Cleaned/Renewables/Renewables_30min_with_non_data.csv")
+
+
   
 
